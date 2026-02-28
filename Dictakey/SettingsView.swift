@@ -4,6 +4,17 @@ struct SettingsView: View {
     @AppStorage("selectedMicUID") private var selectedMicUID: String = ""
     @AppStorage("hotkeyKeyCode") private var hotkeyKeyCode: Int = 49
     @AppStorage("hotkeyModifiers") private var hotkeyModifiers: Int = 2048 // optionKey
+    @AppStorage("whisperModel") private var whisperModel: String = "base"
+
+    static let modelOptions: [(id: String, label: String, detail: String)] = [
+        ("tiny",     "Tiny",     "~65 MB · Fastest, lowest accuracy"),
+        ("base",     "Base",     "~142 MB · Good balance of speed and accuracy"),
+        ("small",    "Small",    "~483 MB · Better accuracy, slightly slower"),
+        ("medium",   "Medium",   "~1.5 GB · High accuracy, slower"),
+        ("large-v3", "Large v3", "~3.1 GB · Best accuracy, slowest"),
+    ]
+
+    private var appStatus = AppStatus.shared
 
     // Load devices immediately so the Picker has valid tags on first render
     @State private var inputDevices: [(uid: String, name: String)] = AudioRecorder.availableInputDevices()
@@ -27,6 +38,36 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.menu)
                 .padding(8)
+            }
+
+            GroupBox("Transcription Model") {
+                Picker("Model", selection: $whisperModel) {
+                    ForEach(Self.modelOptions, id: \.id) { option in
+                        Text("\(option.label)  —  \(option.detail)").tag(option.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .padding(8)
+                .onChange(of: whisperModel) { _, _ in
+                    NotificationCenter.default.post(name: .modelChanged, object: nil)
+                }
+
+                if let progress = appStatus.downloadProgress {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Downloading \(whisperModel) model…")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("\(Int(progress * 100))%")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                        ProgressView(value: progress)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 8)
+                }
             }
 
             GroupBox("Hotkey") {

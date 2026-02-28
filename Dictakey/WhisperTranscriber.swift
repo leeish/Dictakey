@@ -5,16 +5,35 @@ class WhisperTranscriber {
     private var whisperKit: WhisperKit?
     var isModelLoaded = false
 
-    // Model size options: "tiny", "base", "small", "medium", "large-v3"
-    // "base" is a great balance of speed and accuracy for most Macs
-    let modelName = "base"
+    // Called on the main thread during load.
+    // .downloading(fraction) → actively downloading (0–1)
+    // .loading              → download done, initialising model in memory
+    enum LoadPhase { case downloading(Double), loading }
+    var onPhaseChange: ((LoadPhase) -> Void)?
 
     func loadModel() async {
+        let modelName = UserDefaults.standard.string(forKey: "whisperModel") ?? "base"
+        isModelLoaded = false
+        whisperKit = nil
+
         do {
-            print("Loading WhisperKit model: \(modelName)")
-            whisperKit = try await WhisperKit(model: modelName)
+            // WhisperKit.download() is a no-op if the model is already cached,
+            // so progress will jump straight to 1.0 on repeat loads.
+            let modelFolder = try await WhisperKit.download(
+                variant: modelName,
+                progressCallback: { [weak self] progress in
+                    DispatchQueue.main.async {
+                        self?.onPhaseChange?(.downloading(progress.fractionCompleted))
+                    }
+                }
+            )
+
+            // Download finished — now load into memory
+            DispatchQueue.main.async { self.onPhaseChange?(.loading) }
+
+            whisperKit = try await WhisperKit(modelFolder: modelFolder.path)
             isModelLoaded = true
-            print("WhisperKit model loaded successfully")
+            print("WhisperKit model ready: \(modelName)")
         } catch {
             print("Failed to load WhisperKit model: \(error)")
         }

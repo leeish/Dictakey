@@ -5,6 +5,7 @@ import SwiftUI
 extension Notification.Name {
     static let hotkeyRecordingStarted = Notification.Name("Dictakey.hotkeyRecordingStarted")
     static let hotkeyChanged = Notification.Name("Dictakey.hotkeyChanged")
+    static let modelChanged = Notification.Name("Dictakey.modelChanged")
 }
 
 struct HotkeyRecorderView: NSViewRepresentable {

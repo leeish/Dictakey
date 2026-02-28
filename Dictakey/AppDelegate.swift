@@ -28,6 +28,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                                name: .hotkeyRecordingStarted, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(reregisterHotKey),
                                                name: .hotkeyChanged, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(reloadModel),
+                                               name: .modelChanged, object: nil)
 
         setupHotKey()
         requestPermissions()
@@ -35,13 +37,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         recorder = AudioRecorder()
         transcriber = WhisperTranscriber()
 
-        // Load WhisperKit model on launch
-        Task {
-            await transcriber?.loadModel()
-            DispatchQueue.main.async {
-                self.updateStatusIcon(state: .ready)
-            }
-        }
+        startModelLoad()
     }
 
     // MARK: - Status Icon
@@ -156,6 +152,49 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             setupModifierOnlyMonitor()
         } else {
             registerHotKey()
+        }
+    }
+
+    @objc private func reloadModel() {
+        guard !isRecording else { return }
+        startModelLoad()
+    }
+
+    private static let modelSizes: [String: String] = [
+        "tiny":     "~65 MB",
+        "base":     "~142 MB",
+        "small":    "~483 MB",
+        "medium":   "~1.5 GB",
+        "large-v3": "~3.1 GB",
+    ]
+
+    private func startModelLoad() {
+        let modelName = UserDefaults.standard.string(forKey: "whisperModel") ?? "base"
+        updateStatusIcon(state: .loading)
+
+        transcriber?.onPhaseChange = { [weak self] phase in
+            guard let self else { return }
+            let status = AppStatus.shared
+            switch phase {
+            case .downloading(let fraction):
+                let pct = Int(fraction * 100)
+                let size = AppDelegate.modelSizes[modelName] ?? ""
+                status.icon = "⬇️"
+                status.tooltip = "Dictakey: Downloading \(modelName) model \(size)… \(pct)%"
+                status.downloadProgress = fraction
+            case .loading:
+                status.icon = "⏳"
+                status.tooltip = "Dictakey: Loading \(modelName) model…"
+                status.downloadProgress = nil
+            }
+        }
+
+        Task {
+            await transcriber?.loadModel()
+            DispatchQueue.main.async {
+                AppStatus.shared.downloadProgress = nil
+                self.updateStatusIcon(state: .ready)
+            }
         }
     }
 
