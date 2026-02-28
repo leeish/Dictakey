@@ -8,10 +8,12 @@ struct DictakeyApp: App {
     @AppStorage("launchAtLogin") private var launchAtLogin = false
 
     private var appStatus = AppStatus.shared
+    @AppStorage("hotkeyKeyCode") private var hotkeyKeyCode: Int = 49
+    @AppStorage("hotkeyModifiers") private var hotkeyModifiers: Int = 2048
 
     var body: some Scene {
         MenuBarExtra {
-            Text("Hotkey: ⌥Space (hold to record)")
+            Text("Hotkey: \(hotkeyLabel(keyCode: hotkeyKeyCode, modifiers: hotkeyModifiers)) (hold to record)")
             Divider()
             Button("Settings...") {
                 NSApp.activate(ignoringOtherApps: true)
